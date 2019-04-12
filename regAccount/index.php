@@ -1,7 +1,7 @@
 <?php
 // Include config file
 require_once "../config.php";
-require_once ("../PHPMailer/PHPMailer.php");
+//require_once ("../PHPMailer/PHPMailer.php");
 
 //session_start();
 //REQUIRE_ONCE "PHPmailer";
@@ -71,11 +71,28 @@ if($_SERVER["REQUEST_METHOD"] == "POST"){
     }
 
     // Validate password
+    $pwLowerCkr = '/(?=.*[a-z])/';
+    $pwUpperCkr = '/(?=.*[A-Z])/';
+    $pwNumCkr = '/(?=.*[0-9])/';
+    $pwSymCkr = '/(?=.*[!@#$%^&*-+,.><])/';
+    $pwRegChecker = '/(?=.*[!@#$%^&*-+,.><])(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])/';
     if(empty(trim($_POST["password"]))){
         $password_err = "Please enter a password.";
     } elseif(strlen(trim($_POST["password"])) < 6){
-        $password_err = "Password must have atleast 6 characters.";
-    } else{
+        $password_err = "Password must have at least 6 characters.";
+    } 
+    elseif(!preg_match($pwRegChecker, trim($_POST["password"]))) {
+        $password_err = "Password is not fulfilled the characters requirement.";
+    } 
+    elseif(!preg_match($pwLowerCkr, trim($_POST["password"]))) {
+        $password_err = "Password have no lowercase character.";
+    } elseif(!preg_match($pwUpperCkr, trim($_POST["password"]))) {
+        $password_err = "Password have no uppercase character.";
+    } elseif(!preg_match($pwNumCkr, trim($_POST["password"]))) {
+        $password_err = "Password have no numeral character.";
+    } elseif(!preg_match($pwSymCkr, trim($_POST["password"]))) {
+        $password_err = "Password have no symbol (!@#$%^&*-+,.><).";
+    }else{
         $password = trim($_POST["password"]);
     }
 
@@ -126,7 +143,7 @@ if($_SERVER["REQUEST_METHOD"] == "POST"){
     if(empty(trim($_POST["email"]))){
         $email_err = "Please enter your email";
     } else if(!filter_var($_POST["email"], FILTER_VALIDATE_EMAIL)){
-        echo "Your email address is not valid!";
+        $email_err = "Your email address is not valid!";
     } else{
         // Prepare a select statement
         $sql = "SELECT id FROM users WHERE email = :email";
@@ -266,6 +283,9 @@ mail($to, $subject, $htmlStr, $header);*/
             </div>
             <div class="form-group <?php echo (!empty($password_err)) ? 'has-error' : ''; ?>">
                 <label>Password</label>
+                <br>( Password must contain at least 
+                <br>one lowercase, one uppercase, one number 
+                <br>and one special character: !@#$%^&*-+,.>< )
                 <input type="password" name="password" class="form-control">
                 <span class="help-block"><?php echo $password_err; ?></span>
             </div>
