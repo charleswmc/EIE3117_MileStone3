@@ -5,9 +5,12 @@ require_once "../config.php";
 
 //session_start();
 //REQUIRE_ONCE "PHPmailer";
+
 // Define variables and initialize with empty values
-$username = $password = $confirm_password = $phoneNumber = $email = $verified = $verification_code = $fullname = "";            //data need to be stored in the users database
-$username_err = $password_err = $confirm_password_err = $phoneNumber_err = $email_err = $verified_err = $fullname_err = "";
+//data need to be stored in the users database
+$username = $password = $confirm_password = $phoneNumber = $email = $verified = $verification_code = $fullname = $uploadfile = "";  
+
+$username_err = $password_err = $confirm_password_err = $phoneNumber_err = $email_err = $verified_err = $fullname_err = $image_err = "";
 
 $verified = 0;
 // Processing form data when form is submitted
@@ -75,16 +78,11 @@ if($_SERVER["REQUEST_METHOD"] == "POST"){
     $pwUpperCkr = '/(?=.*[A-Z])/';
     $pwNumCkr = '/(?=.*[0-9])/';
     $pwSymCkr = '/(?=.*[!@#$%^&*-+,.><])/';
-    $pwRegChecker = '/(?=.*[!@#$%^&*-+,.><])(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])/';
     if(empty(trim($_POST["password"]))){
         $password_err = "Please enter a password.";
     } elseif(strlen(trim($_POST["password"])) < 6){
         $password_err = "Password must have at least 6 characters.";
-    } 
-    elseif(!preg_match($pwRegChecker, trim($_POST["password"]))) {
-        $password_err = "Password is not fulfilled the characters requirement.";
-    } 
-    elseif(!preg_match($pwLowerCkr, trim($_POST["password"]))) {
+    } elseif(!preg_match($pwLowerCkr, trim($_POST["password"]))) {
         $password_err = "Password have no lowercase character.";
     } elseif(!preg_match($pwUpperCkr, trim($_POST["password"]))) {
         $password_err = "Password have no uppercase character.";
@@ -92,7 +90,7 @@ if($_SERVER["REQUEST_METHOD"] == "POST"){
         $password_err = "Password have no numeral character.";
     } elseif(!preg_match($pwSymCkr, trim($_POST["password"]))) {
         $password_err = "Password have no symbol (!@#$%^&*-+,.><).";
-    }else{
+    } else{
         $password = trim($_POST["password"]);
     }
 
@@ -134,17 +132,17 @@ if($_SERVER["REQUEST_METHOD"] == "POST"){
 
         // Close statement
         unset($stmt);
-    } 
+    }
     /*else{
         $phoneNumber = trim($_POST["phoneNumber"]);
     }*/
 
     // Validate Email
     if(empty(trim($_POST["email"]))){
-        $email_err = "Please enter your email";
-    } else if(!filter_var($_POST["email"], FILTER_VALIDATE_EMAIL)){
+        $email_err = "Please enter your email.";
+    } elseif(!filter_var($_POST["email"], FILTER_VALIDATE_EMAIL)){
         $email_err = "Your email address is not valid!";
-    } else{
+    } else {
         // Prepare a select statement
         $sql = "SELECT id FROM users WHERE email = :email";
 
@@ -168,17 +166,44 @@ if($_SERVER["REQUEST_METHOD"] == "POST"){
                 echo "Oops! Something went wrong. Please try again later.";
             }
         }
-    }   
+    } 
 
-        /*else{
-        $email = trim($_POST["email"]);
-        }*/
+    if(isset($_POST["profileimage"]) || empty($_FILES['profileimage']['tmp_name'])){
+        $image_err = "Please insert your profile image.";
+    } else {
+        $uploaddir = '../profileimage';
+
+        /* Process image with GD library */
+        $verifyimg = getimagesize($_FILES['profileimage']['tmp_name']);
+
+        /* Make sure the MIME type is an image */
+        $pattern = "#^(image/)[^\s\n<]+$#i";
+
+        if(!preg_match($pattern, $verifyimg['mime'])){
+            $image_err = "Only image files are allowed!";
+        }
+        else {
+            $sourcepath = $_FILES['profileimage']['tmp_name'];
+            $imageFileType = pathinfo($_FILES['profileimage']['name'], PATHINFO_EXTENSION);
+            /* Rename both the image and the extension */
+            $newfilename = randImageName($uploaddir, $imageFileType);
+            $uploadfile = $uploaddir."/".$newfilename;
+            try{
+                if(!move_uploaded_file($sourcepath, $uploadfile)){
+                    $image_err = $uploadfile;
+                }
+            }
+            catch (Exception $e) {
+                $image_err = "Something worse while uploading the image file.";
+            }
+        }
+    }
 
     // Check input errors before inserting in database
-    if(empty($username_err) && empty($fullname_err) && empty($password_err) && empty($confirm_password_err) && empty($phoneNumber_err) && empty($email_err) && empty($verified_err) && empty($verification_code)){
+    if(empty($username_err) && empty($fullname_err) && empty($password_err) && empty($confirm_password_err) && empty($phoneNumber_err) && empty($email_err) && empty($image_err) && empty($verified_err) && empty($verification_code)){
 
         // Prepare an insert statement
-        $sql = "INSERT INTO users (username, fullname, password, phoneNumber, email, verified, verification_code) VALUES (:username, :fullname, :password, :phoneNumber, :email, :verified, :verification_code)";
+        $sql = "INSERT INTO users (username, fullname, password, phoneNumber, email, verified, verification_code, image_name) VALUES (:username, :fullname, :password, :phoneNumber, :email, :verified, :verification_code, :image_name)";
 
         if($stmt = $pdo->prepare($sql)){
             // Bind variables to the prepared statement as parameters
@@ -188,7 +213,8 @@ if($_SERVER["REQUEST_METHOD"] == "POST"){
             $stmt->bindParam(":email", $param_email, PDO::PARAM_STR);
             $stmt->bindParam(":phoneNumber", $param_phoneNumber, PDO::PARAM_STR);
             $stmt->bindParam(":verified", $param_verified, PDO::PARAM_STR);
-            $stmt->bindParam("verification_code", $param_verification_code, PDO::PARAM_STR);
+            $stmt->bindParam(":verification_code", $param_verification_code, PDO::PARAM_STR);
+            $stmt->bindParam(":image_name", $param_image_name, PDO::PARAM_STR);
 
             // Set parameters
             $param_username = $username;
@@ -198,6 +224,7 @@ if($_SERVER["REQUEST_METHOD"] == "POST"){
             $param_phoneNumber = $phoneNumber;
             $param_verified = $verified;
             $param_verification_code = md5($email);
+            $param_image_name = $newfilename;
 
             // Attempt to execute the prepared statement
             if($stmt->execute()){
@@ -233,6 +260,18 @@ $header = "From: eie3117group7b@gmail.com";
 
 mail($to, $subject, $htmlStr, $header);*/
 
+/* Generates random filename and extension */
+function randImageName($path, $suffix){
+    do {
+        $rand = mt_rand().".".$suffix;
+        $file = $path."/".$rand;
+        $fp = fopen($file, 'x');
+    }
+    while(!$fp);
+
+    fclose($fp);
+    return $rand;
+}
 ?>
 
 <!DOCTYPE html>
@@ -270,7 +309,7 @@ mail($to, $subject, $htmlStr, $header);*/
     <div class="wrapper">
         <h2>Sign Up</h2>
         <p>Please fill this form to create an account.</p>
-        <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post">
+        <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post" enctype="multipart/form-data">
             <div class="form-group <?php echo (!empty($username_err)) ? 'has-error' : ''; ?>">
                 <label>Username</label>
                 <input type="text" name="username" class="form-control">
@@ -304,6 +343,12 @@ mail($to, $subject, $htmlStr, $header);*/
                 <input type="email" name="email" class="form-control" value="<?php echo $email; ?>">
                 <span class="help-block"><?php echo $email_err; ?></span>
             </div>
+            <div class="form-group <?php echo (!empty($image_err)) ? 'has-error' : ''; ?>">
+                <label>Profile Image</label>
+                <input type="file" name="profileimage" id="profileimage">
+                <span class="help-block"><?php echo $image_err; ?></span>
+            </div>
+            <div>
                 <input type="submit" class="btn btn-primary" value="NEXT">
                 <input type="reset" class="btn btn-default" value="Reset">
             </div>
