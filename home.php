@@ -42,6 +42,7 @@ if(!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true){
       </div>
     	<ul class="nav justify-content-end">
       	<li class="nav-item">
+          <image src="<?php echo 'profileimage/' . $_SESSION["image"]; ?>" height="30" width="30"/>
       		<button onclick="window.location.href='./wallet/save-wallet.php'"type="button" class="btn btn-info">Wallet</button>
 	       	<a href="logout.php" class="btn btn-danger">Sign Out</a>
       	</li>
